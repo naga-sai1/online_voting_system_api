@@ -1,6 +1,7 @@
 const connectToDatabase = require("../misc/db");
 const { Op } = require("sequelize");
 const fs = require("fs").promises;
+const sequelize = require("sequelize");
 
 
 // Get all parties
@@ -131,9 +132,67 @@ const createParty = async (req, res) => {
     }
 };
 
+const getPartyWiseVotingCount = async (req, res) => {
+    try {
+        const { Parties, Voters } = await connectToDatabase();
+        
+        // Get total number of voters
+        const totalVotersCount = await Voters.count();
+        
+        // Get all parties with their vote counts
+        const votingStats = await Parties.findAll({
+            attributes: [
+                'id',
+                'name',
+                'logo',
+                [sequelize.fn('COUNT', sequelize.col('voters.id')), 'votes']
+            ],
+            include: [{
+                model: Voters,
+                attributes: [],
+                as: 'voters',
+                required: false
+            }],
+            group: ['parties.id', 'parties.name', 'parties.logo'],
+            raw: true
+        });
+
+        // Calculate total votes cast
+        const totalVotesCast = votingStats.reduce((sum, party) => sum + parseInt(party.votes || 0), 0);
+
+        // Calculate percentages and format response
+        const formattedStats = votingStats.map(party => ({
+            id: party.id,
+            name: party.name,
+            logo: party.logo,
+            votes: parseInt(party.votes || 0),
+            percentage: totalVotesCast ? ((parseInt(party.votes || 0) / totalVotesCast) * 100).toFixed(2) : "0.00"
+        }));
+
+        // Sort by votes in descending order
+        formattedStats.sort((a, b) => b.votes - a.votes);
+
+        res.status(200).json({
+            message: "Party-wise voting statistics fetched successfully",
+            totalVoters: totalVotersCount,
+            totalVotesCast,
+            votingPercentage: totalVotersCount ? ((totalVotesCast / totalVotersCount) * 100).toFixed(2) : "0.00",
+            statistics: formattedStats
+        });
+
+    } catch (error) {
+        console.error('Error in getPartyWiseVotingCount:', error);
+        res.status(500).json({
+            message: "Internal server error",
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     getAllParties,
-    createParty
+    createParty,
+    getPartyWiseVotingCount
 };
 
 

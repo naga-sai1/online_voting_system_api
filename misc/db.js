@@ -42,6 +42,16 @@ States.hasMany(Parties, {
     as: 'parties'
 });
 
+Parties.hasMany(Voters, {
+    foreignKey: 'party_id',
+    as: 'voters'
+});
+
+Voters.belongsTo(Parties, {
+    foreignKey: 'party_id',
+    as: 'party'
+});
+
 const connection = {};
 
 const connectToDatabase = async () => {
