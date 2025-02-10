@@ -1,4 +1,6 @@
 const connectToDatabase = require("../misc/db");
+const VoterBlockchain = require('../utils/blockchain');
+const voterBlockchain = new VoterBlockchain();
 
 // Get all voters
 const getAllVoters = async (req, res) => {
@@ -87,15 +89,66 @@ const loginVoter = async (req, res) => {
         phone_no,
       },
     });
+
     if (!voter) {
       return res.status(404).json({ message: "Voter not found" });
     }
-    res.status(200).json({ message: "Voter logged in successfully", voter });
+
+    // Add login attempt to blockchain
+    const blockData = {
+      voterId: voter.id,
+      aadhar: maskAadhar(aadhar),
+      timestamp: new Date().toISOString(),
+      action: 'LOGIN'
+    };
+
+    voterBlockchain.addBlock(blockData);
+
+    // Verify blockchain integrity
+    if (!voterBlockchain.isChainValid()) {
+      return res.status(500).json({ 
+        message: "Blockchain integrity compromised",
+        error: "Security violation detected"
+      });
+    }
+
+    // Format voter data with masked sensitive information
+    const formattedVoter = {
+      id: voter.id,
+      name: voter.name,
+      aadhar: maskAadhar(voter.aadhar),
+      phone_no: maskPhoneNumber(voter.phone_no),
+      voted_at: voter.voted_at ? new Date(voter.voted_at).toISOString() : null,
+      has_voted: !!voter.party_id
+    };
+
+    // Return the formatted response
+    res.status(200).json({ 
+      message: "Voter logged in successfully", 
+      voter: formattedVoter,
+      blockchainInfo: {
+        blockHash: voterBlockchain.getLatestBlock().hash,
+        previousHash: voterBlockchain.getLatestBlock().previousHash,
+        timestamp: new Date(voterBlockchain.getLatestBlock().timestamp).toISOString(),
+        verificationStatus: "VERIFIED"
+      }
+    });
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Internal server error", error: error.message });
+    res.status(500).json({ 
+      message: "Internal server error", 
+      error: error.message 
+    });
   }
+};
+
+// Helper functions for masking sensitive data
+const maskAadhar = (aadhar) => {
+  const cleanAadhar = aadhar.replace(/\s/g, '');
+  return `XXXX XXXX ${cleanAadhar.slice(-4)}`;
+};
+
+const maskPhoneNumber = (phone) => {
+  return `XXXXX ${phone.slice(-5)}`;
 };
 
 // total voters count

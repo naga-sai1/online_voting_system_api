@@ -7,6 +7,8 @@ const partiesModel = require("../models/parties.model");
 const statesModel = require("../models/states.model");
 const usersModel = require("../models/users.model");
 const votersModel = require("../models/voters.model");
+const pollsModel = require("../models/polls.model");
+const pollPartiesModel = require("../models/poll_parties.model");
 
 const sequelizeDatabase = new sequilize.Sequelize(
   process.env.DB_NAME,
@@ -23,12 +25,16 @@ const Parties = partiesModel(sequelizeDatabase, sequilize.DataTypes);
 const States = statesModel(sequelizeDatabase, sequilize.DataTypes);
 const Users = usersModel(sequelizeDatabase, sequilize.DataTypes);
 const Voters = votersModel(sequelizeDatabase, sequilize.DataTypes);
+const Polls = pollsModel(sequelizeDatabase, sequilize.DataTypes);
+const PollParties = pollPartiesModel(sequelizeDatabase, sequilize.DataTypes);
 
 const Models = {
   Parties,
   States,
   Users,
   Voters,
+  Polls,
+  PollParties,
 };
 
 // Define associations
@@ -50,6 +56,34 @@ Parties.hasMany(Voters, {
 Voters.belongsTo(Parties, {
     foreignKey: 'party_id',
     as: 'party'
+});
+
+// Poll associations
+Polls.belongsToMany(Parties, {
+  through: PollParties,
+  foreignKey: 'poll_id',
+  as: 'parties'
+});
+
+Parties.belongsToMany(Polls, {
+  through: PollParties,
+  foreignKey: 'party_id',
+  as: 'polls'
+});
+
+PollParties.belongsTo(States, {
+  foreignKey: 'state_id',
+  as: 'state'
+});
+
+PollParties.belongsTo(Polls, {
+  foreignKey: 'poll_id',
+  as: 'poll'
+});
+
+PollParties.belongsTo(Parties, {
+  foreignKey: 'party_id',
+  as: 'party'
 });
 
 const connection = {};

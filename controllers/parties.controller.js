@@ -134,27 +134,37 @@ const createParty = async (req, res) => {
 
 const getPartyWiseVotingCount = async (req, res) => {
     try {
-        const { Parties, Voters } = await connectToDatabase();
+        const { Parties, Voters, States } = await connectToDatabase();
         
         // Get total number of voters
         const totalVotersCount = await Voters.count();
         
-        // Get all parties with their vote counts
+        // Get all parties with their vote counts and state information
         const votingStats = await Parties.findAll({
             attributes: [
                 'id',
                 'name',
                 'logo',
+                'state_id',
                 [sequelize.fn('COUNT', sequelize.col('voters.id')), 'votes']
             ],
-            include: [{
-                model: Voters,
-                attributes: [],
-                as: 'voters',
-                required: false
-            }],
-            group: ['parties.id', 'parties.name', 'parties.logo'],
-            raw: true
+            include: [
+                {
+                    model: Voters,
+                    attributes: [],
+                    as: 'voters',
+                    required: false
+                },
+                {
+                    model: States,
+                    attributes: ['name'],
+                    as: 'state',
+                    required: true
+                }
+            ],
+            group: ['parties.id', 'parties.name', 'parties.logo', 'parties.state_id', 'state.id', 'state.name'],
+            raw: true,
+            nest: true
         });
 
         // Calculate total votes cast
@@ -165,6 +175,8 @@ const getPartyWiseVotingCount = async (req, res) => {
             id: party.id,
             name: party.name,
             logo: party.logo,
+            state_id: party.state_id,
+            state_name: party.state.name,
             votes: parseInt(party.votes || 0),
             percentage: totalVotesCast ? ((parseInt(party.votes || 0) / totalVotesCast) * 100).toFixed(2) : "0.00"
         }));
