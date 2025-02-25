@@ -33,7 +33,7 @@ app.use(pollsRoute);
 
 
 app.get("/", (req, res) => {
-  res.send("Hello World");
+  res.send("Hello this is online voting system API!");
 });
 
 
