@@ -86,6 +86,11 @@ PollParties.belongsTo(Parties, {
   as: 'party'
 });
 
+Polls.hasMany(PollParties, {
+  foreignKey: 'poll_id',
+  as: 'poll_parties'
+});
+
 const connection = {};
 
 const connectToDatabase = async () => {

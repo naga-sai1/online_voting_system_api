@@ -30,6 +30,14 @@ module.exports = (sequelize, Sequelize) => {
         allowNull: false,
         unique: true,
       },
+      state_id: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+      },
+      otp: {
+        type: Sequelize.STRING,
+        allowNull: true
+      }
     },
     {
       tableName: "voters",

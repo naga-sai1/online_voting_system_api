@@ -30,6 +30,10 @@ module.exports = (sequelize, Sequelize) => {
           model: 'states',
           key: 'id'
         }
+      },
+      status: {
+        type: Sequelize.BOOLEAN,
+        default: true,
       }
     },
     {
@@ -38,7 +42,7 @@ module.exports = (sequelize, Sequelize) => {
       engine: "InnoDB",
       indexes: [
         {
-          unique: true,
+          // unique: true,
           fields: ['poll_id', 'party_id', 'state_id']
         }
       ]
