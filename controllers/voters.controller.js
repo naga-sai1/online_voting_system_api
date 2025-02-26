@@ -128,17 +128,9 @@ const loginVoter = async (req, res) => {
     };
 
     // Return the formatted response
-    res.status(200).json({
-      message: "Voter logged in successfully",
-      voter: formattedVoter,
-      blockchainInfo: {
-        blockHash: voterBlockchain.getLatestBlock().hash,
-        previousHash: voterBlockchain.getLatestBlock().previousHash,
-        timestamp: new Date(
-          voterBlockchain.getLatestBlock().timestamp
-        ).toISOString(),
-        verificationStatus: "VERIFIED",
-      },
+    res.status(200).json({ 
+      message: "OTP sent to registered mobile number",
+      verificationRequired: true
     });
   } catch (error) {
     res.status(500).json({
@@ -211,12 +203,38 @@ const verifyOTP = async (req, res) => {
   const { Voters } = await connectToDatabase();
   const { phone_no, otp } = req.body;
   try {
-    if (!(await Voters.findOne({ where: { phone_no } }))) {
-      return res.status(404).json({ message: "Voter is not found!" });
-    }
-    const user = await Voters.findOne({ where: { phone_no, otp } });
-    if (user) {
-      res.status(200).json({ message: "OTP verified successfully", user });
+    const voter = await Voters.findOne({ where: { phone_no, otp } });
+    if (voter) {
+      // Clear OTP after successful verification
+      await Voters.update({ otp: null }, { where: { phone_no } });
+      
+      // Add successful login to blockchain
+      const blockData = {
+        voterId: voter.id,
+        aadhar: maskAadhar(voter.aadhar),
+        timestamp: new Date().toISOString(),
+        action: 'LOGIN_SUCCESS'
+      };
+      voterBlockchain.addBlock(blockData);
+
+      // Format voter data
+      const formattedVoter = {
+        id: voter.id,
+        name: voter.name,
+        aadhar: maskAadhar(voter.aadhar),
+        phone_no: maskPhoneNumber(voter.phone_no),
+        voted_at: voter.voted_at?.toISOString(),
+        has_voted: !!voter.party_id
+      };
+
+      res.status(200).json({ 
+        message: "OTP verified successfully",
+        voter: formattedVoter,
+        blockchainInfo: {
+          blockHash: voterBlockchain.getLatestBlock().hash,
+          verificationStatus: "VERIFIED"
+        }
+      });
     } else {
       res.status(400).json({ message: "Invalid OTP" });
     }
