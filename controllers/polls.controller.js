@@ -99,7 +99,7 @@ const getStateWisePollParties = async (req, res) => {
 
     // Get all poll parties for the active poll with state and party details
     const pollParties = await PollParties.findAll({
-    //   where: { poll_id: activePoll.id },
+      //   where: { poll_id: activePoll.id },
       include: [
         {
           model: States,
@@ -159,49 +159,50 @@ const getAllpollsByStateId = async (req, res) => {
     const { Polls, PollParties, States, Parties } = await connectToDatabase();
 
     const pollsData = await Polls.findAll({
-      include: [{
-        model: PollParties,
-        as: 'poll_parties',
-        where: { state_id: req.params.id },
-        include: [
-          {
-            model: States,
-            as: "state",
-            attributes: ["name", "abbreviation"],
-            required: true
-          },
-          {
-            model: Parties,
-            as: "party",
-            attributes: ["id", "name", "abbreviation", "logo"],
-          }
-        ]
-      }]
+      include: [
+        {
+          model: PollParties,
+          as: "poll_parties",
+          where: { state_id: req.params.id },
+          include: [
+            {
+              model: States,
+              as: "state",
+              attributes: ["name", "abbreviation"],
+              required: true,
+            },
+            {
+              model: Parties,
+              as: "party",
+              attributes: ["id", "name", "abbreviation", "logo"],
+            },
+          ],
+        },
+      ],
     });
 
-    const formattedPolls = pollsData.map(poll => ({
+    const formattedPolls = pollsData.map((poll) => ({
       poll_id: poll.id,
       name: poll.name,
       start_date: poll.start_date,
       end_date: poll.end_date,
       state: {
         id: req.params.id,
-        name: poll.poll_parties[0]?.state?.name || '',
-        abbreviation: poll.poll_parties[0]?.state?.abbreviation || ''
+        name: poll.poll_parties[0]?.state?.name || "",
+        abbreviation: poll.poll_parties[0]?.state?.abbreviation || "",
       },
-      parties: poll.poll_parties.map(pp => ({
+      parties: poll.poll_parties.map((pp) => ({
         party_id: pp.party_id,
         name: pp.party.name,
         abbreviation: pp.party.abbreviation,
-        logo: pp.party.logo
-      }))
+        logo: pp.party.logo,
+      })),
     }));
 
     res.status(200).json({
       message: "All polls fetched successfully",
-      polls: formattedPolls
+      polls: formattedPolls,
     });
-    
   } catch (err) {
     return res.status(500).json({
       message: "Error fetching polls",
@@ -210,8 +211,46 @@ const getAllpollsByStateId = async (req, res) => {
   }
 };
 
+const resetAllPolls = async (req, res) => {
+  const { Polls, PollParties, sequelizeDatabase } = await connectToDatabase();
+
+  const transaction = await sequelizeDatabase.transaction();
+
+  try {
+    // Delete all poll parties first
+    await PollParties.destroy({
+      where: {},
+      truncate: true,
+      transaction,
+    });
+
+    // Then delete all polls
+    await Polls.destroy({
+      where: {},
+      transaction,
+    });
+
+    await transaction.commit();
+
+    res.status(200).json({
+      message: "All polls and poll parties reset successfully",
+      resetCount: {
+        polls: 0,
+        pollParties: 0,
+      },
+    });
+  } catch (error) {
+    await transaction.rollback();
+    res.status(500).json({
+      message: "Error resetting polls",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   conductPoll,
   getStateWisePollParties,
-  getAllpollsByStateId
+  getAllpollsByStateId,
+  resetAllPolls,
 };

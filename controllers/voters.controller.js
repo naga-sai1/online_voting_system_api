@@ -1,5 +1,5 @@
 const connectToDatabase = require("../misc/db");
-const VoterBlockchain = require('../utils/blockchain');
+const VoterBlockchain = require("../utils/blockchain");
 const voterBlockchain = new VoterBlockchain();
 const { sendSMS } = require("../services/sms");
 
@@ -53,7 +53,7 @@ const castVote = async (req, res) => {
         .json({ message: "Voter already voted for a party" });
     }
 
-   await Voters.update(
+    await Voters.update(
       {
         party_id: party_id,
       },
@@ -104,16 +104,16 @@ const loginVoter = async (req, res) => {
       voterId: voter.id,
       aadhar: maskAadhar(aadhar),
       timestamp: new Date().toISOString(),
-      action: 'LOGIN'
+      action: "LOGIN",
     };
 
     voterBlockchain.addBlock(blockData);
 
     // Verify blockchain integrity
     if (!voterBlockchain.isChainValid()) {
-      return res.status(500).json({ 
+      return res.status(500).json({
         message: "Blockchain integrity compromised",
-        error: "Security violation detected"
+        error: "Security violation detected",
       });
     }
 
@@ -124,31 +124,33 @@ const loginVoter = async (req, res) => {
       aadhar: maskAadhar(voter.aadhar),
       phone_no: maskPhoneNumber(voter.phone_no),
       voted_at: voter.voted_at ? new Date(voter.voted_at).toISOString() : null,
-      has_voted: !!voter.party_id
+      has_voted: !!voter.party_id,
     };
 
     // Return the formatted response
-    res.status(200).json({ 
-      message: "Voter logged in successfully", 
+    res.status(200).json({
+      message: "Voter logged in successfully",
       voter: formattedVoter,
       blockchainInfo: {
         blockHash: voterBlockchain.getLatestBlock().hash,
         previousHash: voterBlockchain.getLatestBlock().previousHash,
-        timestamp: new Date(voterBlockchain.getLatestBlock().timestamp).toISOString(),
-        verificationStatus: "VERIFIED"
-      }
+        timestamp: new Date(
+          voterBlockchain.getLatestBlock().timestamp
+        ).toISOString(),
+        verificationStatus: "VERIFIED",
+      },
     });
   } catch (error) {
-    res.status(500).json({ 
-      message: "Internal server error", 
-      error: error.message 
+    res.status(500).json({
+      message: "Internal server error",
+      error: error.message,
     });
   }
 };
 
 // Helper functions for masking sensitive data
 const maskAadhar = (aadhar) => {
-  const cleanAadhar = aadhar.replace(/\s/g, '');
+  const cleanAadhar = aadhar.replace(/\s/g, "");
   return `XXXX XXXX ${cleanAadhar.slice(-4)}`;
 };
 
@@ -177,51 +179,51 @@ function getOTP(length) {
 
 // Send OTP
 const sendOTP = async (req, res) => {
-    const { Voters } = await connectToDatabase();
-    const { phone_no } = req.body;
+  const { Voters } = await connectToDatabase();
+  const { phone_no } = req.body;
 
-    // check voter is exist or not!
-    const check_voter = await Voters.findOne({phone_no})
+  // check voter is exist or not!
+  const check_voter = await Voters.findOne({ phone_no });
 
-    if (!check_voter){
-        return res.status(404).Json({message: "voter not found!"})
+  if (!check_voter) {
+    return res.status(404).Json({ message: "voter not found!" });
+  }
+  // const uid = uuidv4();
+  const otp = getOTP(6);
+  try {
+    if (await Voters.findOne({ where: { phone_no } })) {
+      await Voters.update({ otp }, { where: { phone_no } });
     }
-    // const uid = uuidv4();
-    const otp = getOTP(6);
-    try {
-      if (await Voters.findOne({ where: { phone_no } })) {
-        await Voters.update({ otp}, { where: { phone_no } });
-      } 
-      const name = "voter"
-      // ignore the sendSMS function on this phone number = 9876543210
+    const name = "voter";
+    // ignore the sendSMS function on this phone number = 9876543210
     //   if (phone === "9876543210") {
     //     await UserData.update({ otp : 123456 }, { where: { phone } });
     //     return res.status(200).json({ message: "OTP sent successfully" });
     //   }
-      await sendSMS(phone_no, name, otp);
-      res.status(200).json({ message: "OTP sent successfully" });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  };
+    await sendSMS(phone_no, name, otp);
+    res.status(200).json({ message: "OTP sent successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
 
 const verifyOTP = async (req, res) => {
-    const { Voters } = await connectToDatabase();
-    const { phone_no, otp } = req.body;
-    try {
-      if (!(await Voters.findOne({ where: { phone_no } }))) {
-        return res.status(404).json({ message: "Voter is not found!" });
-      }
-      const user = await Voters.findOne({ where: { phone_no, otp } });
-      if (user) {
-        res.status(200).json({ message: "OTP verified successfully", user });
-      } else {
-        res.status(400).json({ message: "Invalid OTP" });
-      }
-    } catch (error) {
-      res.status(500).json({ error: error.message });
+  const { Voters } = await connectToDatabase();
+  const { phone_no, otp } = req.body;
+  try {
+    if (!(await Voters.findOne({ where: { phone_no } }))) {
+      return res.status(404).json({ message: "Voter is not found!" });
     }
-  };
+    const user = await Voters.findOne({ where: { phone_no, otp } });
+    if (user) {
+      res.status(200).json({ message: "OTP verified successfully", user });
+    } else {
+      res.status(400).json({ message: "Invalid OTP" });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
 
 module.exports = {
   getAllVoters,
@@ -229,5 +231,5 @@ module.exports = {
   loginVoter,
   totalVotersCount,
   sendOTP,
-  verifyOTP
+  verifyOTP,
 };
