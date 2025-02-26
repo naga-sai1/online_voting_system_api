@@ -71,7 +71,7 @@ Parties.belongsToMany(Polls, {
   as: 'polls'
 });
 
-PollParties.belongsTo(States, {
+Polls.belongsTo(States, {
   foreignKey: 'state_id',
   as: 'state'
 });

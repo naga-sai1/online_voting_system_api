@@ -23,14 +23,6 @@ module.exports = (sequelize, Sequelize) => {
           key: 'id'
         }
       },
-      state_id: {
-        type: Sequelize.INTEGER,
-        allowNull: false,
-        references: {
-          model: 'states',
-          key: 'id'
-        }
-      },
       status: {
         type: Sequelize.BOOLEAN,
         default: true,

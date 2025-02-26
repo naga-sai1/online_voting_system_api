@@ -3,12 +3,12 @@ const sequelize = require("sequelize");
 
 // conduct poll
 const conductPoll = async (req, res) => {
+  const { Polls, PollParties, States, Parties, sequelizeDatabase } =
+    await connectToDatabase();
+
+  const transaction = await sequelizeDatabase.transaction();
+
   try {
-    const { Polls, PollParties, States, Parties, sequelizeDatabase } =
-      await connectToDatabase();
-
-    const transaction = await sequelizeDatabase.transaction();
-
     const { name, description, start_date, end_date, state_id, party_list } =
       req.body;
 
@@ -18,17 +18,6 @@ const conductPoll = async (req, res) => {
       });
     }
 
-    // Create the poll
-    const newPoll = await Polls.create(
-      {
-        name,
-        description,
-        start_date: new Date(start_date),
-        end_date: new Date(end_date),
-      },
-      { transaction }
-    );
-
     // Validate state exists
     const state = await States.findByPk(state_id, { transaction });
     if (!state) {
@@ -37,6 +26,40 @@ const conductPoll = async (req, res) => {
         message: `State not found: ${state_id}`,
       });
     }
+
+    // Check for existing poll in this state
+    const existingPoll = await Polls.findOne({
+      where: { 
+        state_id,
+        // [sequelize.Op.or]: [
+        //   { end_date: { [sequelize.Op.gte]: new Date() } },
+        //   { start_date: { [sequelize.Op.gte]: new Date(start_date) } }
+        // ]
+      },
+      transaction
+    });
+    
+    if (existingPoll) {
+      await transaction.rollback();
+      return res.status(400).json({
+        message: "State already has an active poll",
+        existingPollId: existingPoll.id
+      });
+    }
+
+
+
+    // Create the poll
+    const newPoll = await Polls.create(
+      {
+        name,
+        description,
+        start_date: new Date(start_date),
+        end_date: new Date(end_date),
+        state_id,
+      },
+      { transaction }
+    );
 
     // Process each party in party_list
     for (const partyId of party_list) {
@@ -52,7 +75,6 @@ const conductPoll = async (req, res) => {
         {
           poll_id: newPoll.id,
           party_id: partyId,
-          state_id: state_id,
         },
         { transaction }
       );
@@ -67,7 +89,7 @@ const conductPoll = async (req, res) => {
         name: newPoll.name,
         start_date: newPoll.start_date,
         end_date: newPoll.end_date,
-        state_id,
+        state_id: newPoll.state_id,
         party_list,
       },
     });
@@ -80,97 +102,91 @@ const conductPoll = async (req, res) => {
   }
 };
 
-const getStateWisePollParties = async (req, res) => {
-  try {
-    const { Polls, PollParties, States, Parties } = await connectToDatabase();
+// const getStateWisePollParties = async (req, res) => {
+//   try {
+//     const { Polls, PollParties, States, Parties } = await connectToDatabase();
 
-    // Get active poll (where current time is between start and end dates)
-    const currentDate = new Date();
-    const activePoll = await Polls.findAll({
-      where: {
-        start_date: { [sequelize.Op.lte]: currentDate },
-        end_date: { [sequelize.Op.gte]: currentDate },
-      },
-    });
+//     // Get active poll (where current time is between start and end dates)
+//     const currentDate = new Date();
+//     const activePoll = await Polls.findAll({
+//       where: {
+//         start_date: { [sequelize.Op.lte]: currentDate },
+//         end_date: { [sequelize.Op.gte]: currentDate },
+//       },
+//     });
 
-    if (!activePoll) {
-      return res.status(404).json({ message: "No active poll found" });
-    }
+//     if (!activePoll) {
+//       return res.status(404).json({ message: "No active poll found" });
+//     }
 
-    // Get all poll parties for the active poll with state and party details
-    const pollParties = await PollParties.findAll({
-      //   where: { poll_id: activePoll.id },
-      include: [
-        {
-          model: States,
-          as: "state",
-          attributes: ["id", "name", "abbreviation"],
-        },
-        {
-          model: Parties,
-          as: "party",
-          attributes: ["id", "name", "abbreviation", "logo"],
-        },
-      ],
-    });
+//     // Get all poll parties for the active poll with state and party details
+//     const pollParties = await PollParties.findAll({
+//       //   where: { poll_id: activePoll.id },
+//       include: [
+//         {
+//           model: States,
+//           as: "state",
+//           attributes: ["id", "name", "abbreviation"],
+//         },
+//         {
+//           model: Parties,
+//           as: "party",
+//           attributes: ["id", "name", "abbreviation", "logo"],
+//         },
+//       ],
+//     });
 
-    // Group by state
-    const stateWiseParties = pollParties.reduce((acc, pp) => {
-      const stateId = pp.state_id;
-      if (!acc[stateId]) {
-        acc[stateId] = {
-          state_id: stateId,
-          state_name: pp.state.name,
-          state_abbreviation: pp.state.abbreviation,
-          parties: [],
-        };
-      }
+//     // Group by state
+//     const stateWiseParties = pollParties.reduce((acc, pp) => {
+//       const stateId = pp.state_id;
+//       if (!acc[stateId]) {
+//         acc[stateId] = {
+//           state_id: stateId,
+//           state_name: pp.state.name,
+//           state_abbreviation: pp.state.abbreviation,
+//           parties: [],
+//         };
+//       }
 
-      acc[stateId].parties.push({
-        party_id: pp.party.id,
-        name: pp.party.name,
-        abbreviation: pp.party.abbreviation,
-        logo: pp.party.logo,
-      });
+//       acc[stateId].parties.push({
+//         party_id: pp.party.id,
+//         name: pp.party.name,
+//         abbreviation: pp.party.abbreviation,
+//         logo: pp.party.logo,
+//       });
 
-      return acc;
-    }, {});
+//       return acc;
+//     }, {});
 
-    res.status(200).json({
-      message: "State-wise poll parties fetched successfully",
-      poll: {
-        id: activePoll.id,
-        name: activePoll.name,
-        start_date: activePoll.start_date,
-        end_date: activePoll.end_date,
-      },
-      state_parties: Object.values(stateWiseParties),
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: "Error fetching state-wise poll parties",
-      error: error.message,
-    });
-  }
-};
+//     res.status(200).json({
+//       message: "State-wise poll parties fetched successfully",
+//       poll: {
+//         id: activePoll.id,
+//         name: activePoll.name,
+//         start_date: activePoll.start_date,
+//         end_date: activePoll.end_date,
+//       },
+//       state_parties: Object.values(stateWiseParties),
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       message: "Error fetching state-wise poll parties",
+//       error: error.message,
+//     });
+//   }
+// };
 
 const getAllpollsByStateId = async (req, res) => {
   try {
     const { Polls, PollParties, States, Parties } = await connectToDatabase();
 
     const pollsData = await Polls.findAll({
+      where: { state_id: req.params.id },
       include: [
         {
           model: PollParties,
           as: "poll_parties",
-          where: { state_id: req.params.id },
           include: [
-            {
-              model: States,
-              as: "state",
-              attributes: ["name", "abbreviation"],
-              required: true,
-            },
             {
               model: Parties,
               as: "party",
@@ -181,6 +197,8 @@ const getAllpollsByStateId = async (req, res) => {
       ],
     });
 
+    const state_details = await States.findByPk(req.params.id)
+
     const formattedPolls = pollsData.map((poll) => ({
       poll_id: poll.id,
       name: poll.name,
@@ -188,8 +206,8 @@ const getAllpollsByStateId = async (req, res) => {
       end_date: poll.end_date,
       state: {
         id: req.params.id,
-        name: poll.poll_parties[0]?.state?.name || "",
-        abbreviation: poll.poll_parties[0]?.state?.abbreviation || "",
+        name: state_details.name || "",
+        abbreviation: state_details.abbreviation || "",
       },
       parties: poll.poll_parties.map((pp) => ({
         party_id: pp.party_id,
@@ -250,7 +268,7 @@ const resetAllPolls = async (req, res) => {
 
 module.exports = {
   conductPoll,
-  getStateWisePollParties,
+  // getStateWisePollParties,
   getAllpollsByStateId,
   resetAllPolls,
 };

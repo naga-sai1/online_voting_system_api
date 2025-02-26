@@ -32,6 +32,14 @@ module.exports = (sequelize, Sequelize) => {
         type: Sequelize.DATE,
         allowNull: true,
       },
+      state_id: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        references: {
+          model: 'states',
+          key: 'id'
+        }
+      },
     },
     {
       tableName: "polls",
