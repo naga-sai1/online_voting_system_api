@@ -9,11 +9,11 @@ module.exports = (sequelize, Sequelize) => {
       },
       party_id: {
         type: Sequelize.INTEGER,
-        allowNull: false,
+        allowNull: true,
       },
       voted_at: {
         type: Sequelize.DATE,
-        allowNull: false,
+        allowNull: true,
         defaultValue: Sequelize.NOW,
       },
       name: {
