@@ -29,25 +29,23 @@ const conductPoll = async (req, res) => {
 
     // Check for existing poll in this state
     const existingPoll = await Polls.findOne({
-      where: { 
+      where: {
         state_id,
         // [sequelize.Op.or]: [
         //   { end_date: { [sequelize.Op.gte]: new Date() } },
         //   { start_date: { [sequelize.Op.gte]: new Date(start_date) } }
         // ]
       },
-      transaction
+      transaction,
     });
-    
+
     if (existingPoll) {
       await transaction.rollback();
       return res.status(400).json({
         message: "State already has an active poll",
-        existingPollId: existingPoll.id
+        existingPollId: existingPoll.id,
       });
     }
-
-
 
     // Create the poll
     const newPoll = await Polls.create(
@@ -197,7 +195,7 @@ const getAllpollsByStateId = async (req, res) => {
       ],
     });
 
-    const state_details = await States.findByPk(req.params.id)
+    const state_details = await States.findByPk(req.params.id);
 
     const formattedPolls = pollsData.map((poll) => ({
       poll_id: poll.id,
@@ -230,7 +228,8 @@ const getAllpollsByStateId = async (req, res) => {
 };
 
 const resetAllPolls = async (req, res) => {
-  const { Polls, PollParties, Voters, sequelizeDatabase } = await connectToDatabase();
+  const { Polls, PollParties, Voters, sequelizeDatabase } =
+    await connectToDatabase();
 
   const transaction = await sequelizeDatabase.transaction();
 
@@ -248,16 +247,16 @@ const resetAllPolls = async (req, res) => {
       transaction,
     });
 
-     // Update all voters to remove party_id
-     await Voters.update(
+    // Update all voters to remove party_id
+    await Voters.update(
       {
-          party_id: null,
-          voted_at: null
+        party_id: null,
+        voted_at: null,
       },
       {
-          where: {} // Empty where clause to update all records
+        where: {}, // Empty where clause to update all records
       }
-  );
+    );
 
     await transaction.commit();
 
