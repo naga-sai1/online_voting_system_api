@@ -69,9 +69,10 @@ const createParty = async (req, res) => {
         // Check if party name or abbreviation already exists
         const existingParty = await Parties.findOne({
             where: {
-                [Op.or]: [
+                [Op.and]: [
                     { name: name },
-                    { abbreviation: abbreviation }
+                    { abbreviation: abbreviation },
+                    { state_id: state_id}
                 ]
             }
         });
@@ -81,7 +82,7 @@ const createParty = async (req, res) => {
                 await fs.unlink(req.file.path).catch(console.error);
             }
             return res.status(400).json({ 
-                message: "Party with this name or abbreviation already exists" 
+                message: "Party is already exists in this state" 
             });
         }
 

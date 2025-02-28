@@ -230,7 +230,7 @@ const getAllpollsByStateId = async (req, res) => {
 };
 
 const resetAllPolls = async (req, res) => {
-  const { Polls, PollParties, sequelizeDatabase } = await connectToDatabase();
+  const { Polls, PollParties, Voters, sequelizeDatabase } = await connectToDatabase();
 
   const transaction = await sequelizeDatabase.transaction();
 
@@ -247,6 +247,17 @@ const resetAllPolls = async (req, res) => {
       where: {},
       transaction,
     });
+
+     // Update all voters to remove party_id
+     await Voters.update(
+      {
+          party_id: null,
+          voted_at: null
+      },
+      {
+          where: {} // Empty where clause to update all records
+      }
+  );
 
     await transaction.commit();
 
