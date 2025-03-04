@@ -135,12 +135,24 @@ const createParty = async (req, res) => {
 
 const getPartyWiseVotingCount = async (req, res) => {
     try {
-        const { Parties, Voters, States } = await connectToDatabase();
+        const { Parties, Voters, States, Polls, PollParties } = await connectToDatabase();
+
+        // Find active polls
+        const currentDate = new Date();
+        const activePolls = await Polls.findAll({
+            where: {
+                start_date: { [Op.lte]: currentDate },
+                end_date: { [Op.gte]: currentDate }
+            }
+        });
+
+        if (!activePolls.length) {
+            return res.status(404).json({
+                message: "No active polls found"
+            });
+        }
         
-        // Get total number of voters
-        const totalVotersCount = await Voters.count();
-        
-        // Get all parties with their vote counts and state information
+        // Get parties participated in active polls
         const votingStats = await Parties.findAll({
             attributes: [
                 'id',
@@ -161,11 +173,31 @@ const getPartyWiseVotingCount = async (req, res) => {
                     attributes: ['name'],
                     as: 'state',
                     required: true
+                },
+                {
+                    model: Polls,
+                    as: 'polls',
+                    attributes: [],
+                    through: {
+                        model: PollParties,
+                        as: 'poll_parties',
+                        attributes: [],
+                        where: {
+                            poll_id: { [Op.in]: activePolls.map(poll => poll.id) }
+                        }
+                    }
                 }
             ],
             group: ['parties.id', 'parties.name', 'parties.logo', 'parties.state_id', 'state.id', 'state.name'],
             raw: true,
             nest: true
+        });
+
+        // Get total number of voters eligible for this poll
+        const totalVotersCount = await Voters.count({
+            where: {
+                state_id: { [Op.in]: activePolls.map(poll => poll.state_id) }
+            }
         });
 
         // Calculate total votes cast

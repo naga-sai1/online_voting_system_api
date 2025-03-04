@@ -178,6 +178,22 @@ const getAllpollsByStateId = async (req, res) => {
   try {
     const { Polls, PollParties, States, Parties } = await connectToDatabase();
 
+    // Get active polls
+    const currentDate = new Date();
+    const activePolls = await Polls.findAll({
+      where: {
+        start_date: { [sequelize.Op.lte]: currentDate },
+        end_date: { [sequelize.Op.gte]: currentDate },
+
+      }
+    })
+
+    if (!activePolls.length) {
+      return res.status(404).json({
+        message: "No active polls found"
+      })
+    }
+
     const pollsData = await Polls.findAll({
       where: { state_id: req.params.id },
       include: [
