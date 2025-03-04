@@ -185,6 +185,9 @@ const getPartyWiseVotingCount = async (req, res) => {
                         where: {
                             poll_id: { [Op.in]: activePolls.map(poll => poll.id) }
                         }
+                    },
+                    where: {
+                        id: { [Op.in]: activePolls.map(poll => poll.id) }
                     }
                 }
             ],
