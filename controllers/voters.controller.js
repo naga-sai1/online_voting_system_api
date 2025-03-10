@@ -2,6 +2,7 @@ const connectToDatabase = require("../misc/db");
 const VoterBlockchain = require("../utils/blockchain");
 const voterBlockchain = new VoterBlockchain();
 const { sendSMS } = require("../services/sms");
+const { Op } = require("sequelize");
 
 // Get all voters
 const getAllVoters = async (req, res) => {
@@ -245,6 +246,69 @@ const verifyOTP = async (req, res) => {
   }
 };
 
+const addVoter = async (req, res) => {
+  const { Voters, States, sequelizeDatabase } = await connectToDatabase();
+
+  // Initialize transaction
+  const transaction = await sequelizeDatabase.transaction();
+
+  try {
+    const { aadhar, phone_no, state_id } = req.body;
+
+    // Validate required fields
+    if (!aadhar || !phone_no || !state_id) {
+      return res.status(400).json({
+        message: "Aadhar, Phone number and state are required fields",
+      });
+    }
+
+    // check if state exists
+    const state = await States.findByPk(state_id, { transaction });
+    if (!state) {
+      await transaction.rollback();
+      return res.status(404).json({
+        message: "State not found",
+      });
+    }
+
+    // check if voter with aadhar & phone_no already exists
+    const checkVoter = await Voters.findOne({
+      where: {
+        [Op.and]: [{ aadhar: aadhar }, { phone_no: phone_no }],
+      },
+      transaction,
+    });
+    if (checkVoter) {
+      await transaction.rollback();
+      return res.status(400).json({
+        message: `Voter with this Aadhar and Phone Number already exists`,
+      });
+    }
+    const newVoter = await Voters.create({ ...req.body }, { transaction });
+    
+    // If everything is successful, commit the transaction
+    await transaction.commit();
+
+    // Format the response
+    const formattedVoter = {
+      id: newVoter.id,
+      name: newVoter.name,
+      aadhar: maskAadhar(newVoter.aadhar), // Assuming you have the maskAadhar function
+      phone_no: maskPhoneNumber(newVoter.phone_no), // Assuming you have the maskPhoneNumber function
+      state_id: newVoter.state_id,
+      created_at: newVoter.created_at,
+    };
+
+    // Send success response
+    return res.status(201).json({
+      message: "Voter created successfully",
+      voter: formattedVoter,
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   getAllVoters,
   castVote,
@@ -252,4 +316,5 @@ module.exports = {
   totalVotersCount,
   sendOTP,
   verifyOTP,
+  addVoter,
 };

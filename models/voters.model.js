@@ -13,8 +13,7 @@ module.exports = (sequelize, Sequelize) => {
       },
       voted_at: {
         type: Sequelize.DATE,
-        allowNull: true,
-        defaultValue: Sequelize.NOW,
+        allowNull: true
       },
       name: {
         type: Sequelize.STRING,
