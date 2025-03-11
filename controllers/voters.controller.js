@@ -285,7 +285,7 @@ const addVoter = async (req, res) => {
       });
     }
     const newVoter = await Voters.create({ ...req.body }, { transaction });
-    
+
     // If everything is successful, commit the transaction
     await transaction.commit();
 
@@ -293,8 +293,8 @@ const addVoter = async (req, res) => {
     const formattedVoter = {
       id: newVoter.id,
       name: newVoter.name,
-      aadhar: maskAadhar(newVoter.aadhar), // Assuming you have the maskAadhar function
-      phone_no: maskPhoneNumber(newVoter.phone_no), // Assuming you have the maskPhoneNumber function
+      aadhar: maskAadhar(newVoter.aadhar),
+      phone_no: maskPhoneNumber(newVoter.phone_no),
       state_id: newVoter.state_id,
       created_at: newVoter.created_at,
     };
